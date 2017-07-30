@@ -31,11 +31,7 @@ public class SliderPuzzle extends JFrame
 		cp.add(puzzleSpace, BorderLayout.CENTER);
 		puzzleSpace.addMouseListener(new MouseListener() {
 			@Override
-			public void mouseClicked(MouseEvent event)
-			{
-				puzzleSpace.makeMove(event.getPoint());
-				puzzleSpace.repaint();
-			}
+			public void mouseClicked(MouseEvent event){}
 			@Override
 			public void mouseEntered(MouseEvent event){}
 			@Override
@@ -43,7 +39,11 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void mouseReleased(MouseEvent event){}
 			@Override
-			public void mousePressed(MouseEvent event){}
+			public void mousePressed(MouseEvent event)
+			{
+				puzzleSpace.makeMove(event.getPoint());
+				puzzleSpace.repaint();
+			}
 		});
 		
 		// Set up the button space.
@@ -87,7 +87,11 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent event)
 			{
-				scrambler.setText("Pressed!");
+				if(puzzleSpace.getImage() != null)
+				{
+					puzzleSpace.scramble();
+					puzzleSpace.repaint();
+				}
 			}
 		});
 		
@@ -97,7 +101,8 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent event)
 			{
-				solver.setText("Pressed!");
+				puzzleSpace.solve();
+				puzzleSpace.repaint();
 			}
 		});
 		
@@ -137,6 +142,10 @@ public class SliderPuzzle extends JFrame
 			System.exit(0);
 		}
 		
-		new SliderPuzzle();
+		javax.swing.SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				new SliderPuzzle();
+			}
+		});
 	}
 }
