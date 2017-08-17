@@ -9,6 +9,8 @@ import javax.swing.*;
 
 public class SliderPuzzle extends JFrame
 {
+	public static boolean inAnimation;
+	
 	private PuzzlePanel puzzleSpace;
 	private JPanel buttonSpace;
 	
@@ -22,6 +24,8 @@ public class SliderPuzzle extends JFrame
 	public SliderPuzzle()
 	{
 		super("Slider Puzzle");
+		
+		inAnimation = false;
 		
 		Container cp = getContentPane();
 		cp.setLayout(new BorderLayout(0,0));
@@ -41,6 +45,9 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void mousePressed(MouseEvent event)
 			{
+				if(inAnimation)
+					return;
+				
 				puzzleSpace.makeMove(event.getPoint());
 				puzzleSpace.repaint();
 			}
@@ -57,6 +64,9 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent event)
 			{
+				if(inAnimation)
+					return;
+				
 				File file = null;
 				int state = loader.showOpenDialog(null);
 				if(state == JFileChooser.APPROVE_OPTION)
@@ -87,6 +97,9 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent event)
 			{
+				if(inAnimation)
+					return;
+				
 				if(puzzleSpace.getImage() != null)
 				{
 					puzzleSpace.scramble();
@@ -101,6 +114,9 @@ public class SliderPuzzle extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent event)
 			{
+				if(inAnimation)
+					return;
+				
 				puzzleSpace.solve();
 				puzzleSpace.repaint();
 			}

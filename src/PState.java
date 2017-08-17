@@ -4,6 +4,9 @@ import java.util.LinkedList;
 
 public class PState
 {
+	public static final byte EMPTY = -1;
+	public static final byte FREE = -2;
+	
 	public byte move; // Represents the move taken to get to this state.
 	
 	public byte grid[]; // The state representation of the grid.
@@ -20,7 +23,7 @@ public class PState
 		this.empty = empty;
 		this.g = g;
 		this.parent = parent;
-		this.h = computeHeuristic(grid);
+		this.h = computeHeuristic();
 		this.move = Constants.NONE;
 	}
 	
@@ -51,19 +54,41 @@ public class PState
 	 * @param state - array representing the state of the board.
 	 * @return h - the computed heuristic
 	 */
-	public short computeHeuristic(byte state[])
+	public short computeHeuristic()
 	{
 		short h = 0;
-		int row, col, tRow, tCol;
-		for(int i = 0; i < state.length; i++)
+		if(parent != null)
 		{
-			if(state[i] >= 0)
+			int val, row, col, nRow, nCol, oRow, oCol, newDiff, oldDiff;
+		
+			h = parent.h;
+			
+			val = grid[parent.empty];
+			row = val/Options.GRID_ROOT;
+			col = val%Options.GRID_ROOT;
+			nRow = parent.empty/Options.GRID_ROOT;
+			nCol = parent.empty%Options.GRID_ROOT;
+			oRow = this.empty/Options.GRID_ROOT;
+			oCol = this.empty%Options.GRID_ROOT;
+			
+			newDiff = Math.abs(nRow - row) + Math.abs(nCol - col);
+			oldDiff = Math.abs(oRow - row) + Math.abs(oCol - col);
+			
+			h += newDiff - oldDiff;
+		}
+		else
+		{
+			int row, col, tRow, tCol;
+			for(int i = 0; i < grid.length; i++)
 			{
-				row = i/Constants.GRID_ROOT;
-				col = i%Constants.GRID_ROOT;
-				tRow = state[i]/Constants.GRID_ROOT;
-				tCol = state[i]%Constants.GRID_ROOT;
-				h += Math.abs(tRow - row) + Math.abs(tCol - col);
+				if(grid[i] >= 0)
+				{
+					row = i/Options.GRID_ROOT;
+					col = i%Options.GRID_ROOT;
+					tRow = grid[i]/Options.GRID_ROOT;
+					tCol = grid[i]%Options.GRID_ROOT;
+					h += Math.abs(tRow - row) + Math.abs(tCol - col);
+				}
 			}
 		}
 
@@ -83,27 +108,27 @@ public class PState
 
 		ArrayList<PState> successors = new ArrayList<PState>();
 		byte[] child;
-		int eRow = empty/Constants.GRID_ROOT;
-		int eCol = empty%Constants.GRID_ROOT;
+		int eRow = empty/Options.GRID_ROOT;
+		int eCol = empty%Options.GRID_ROOT;
 
 		int newPos;
 		if(eRow - 1 >= 0)
 		{
 			child = Arrays.copyOf(grid, grid.length);
 
-			newPos = (eRow - 1)*Constants.GRID_ROOT + eCol;
+			newPos = (eRow - 1)*Options.GRID_ROOT + eCol;
 			child[empty] = child[newPos];
-			child[newPos] = -1;
+			child[newPos] = EMPTY;
 			successors.add(new PState(child, (byte)newPos, (short)(g + 1), this, Constants.UP));
 		}
 
-		if(eRow + 1 < Constants.GRID_ROOT)
+		if(eRow + 1 < Options.GRID_ROOT)
 		{
 			child = Arrays.copyOf(grid, grid.length);
 
-			newPos = (eRow + 1)*Constants.GRID_ROOT + eCol;
+			newPos = (eRow + 1)*Options.GRID_ROOT + eCol;
 			child[empty] = child[newPos];
-			child[newPos] = -1;
+			child[newPos] = EMPTY;
 			successors.add(new PState(child, (byte)newPos, (short)(g + 1), this, Constants.DOWN));
 		}
 
@@ -111,23 +136,51 @@ public class PState
 		{
 			child = Arrays.copyOf(grid, grid.length);
 
-			newPos = (eRow)*Constants.GRID_ROOT + (eCol - 1);
+			newPos = (eRow)*Options.GRID_ROOT + (eCol - 1);
 			child[empty] = child[newPos];
-			child[newPos] = -1;
+			child[newPos] = EMPTY;
 			successors.add(new PState(child, (byte)newPos, (short)(g + 1), this, Constants.LEFT));
 		}
 
-		if(eCol + 1 < Constants.GRID_ROOT)
+		if(eCol + 1 < Options.GRID_ROOT)
 		{
 			child = Arrays.copyOf(grid, grid.length);
 
-			newPos = (eRow)*Constants.GRID_ROOT + (eCol + 1);
+			newPos = (eRow)*Options.GRID_ROOT + (eCol + 1);
 			child[empty] = child[newPos];
-			child[newPos] = -1;
+			child[newPos] = EMPTY;
 			successors.add(new PState(child, (byte)newPos, (short)(g + 1), this, Constants.RIGHT));
 		}
 
 		return successors;
+	}
+	
+	/**
+	 * Checks whether this state is a goal state. Uses .equals() if there
+	 * is only one goal state otherwise it checks for FREE tiles.
+	 * 
+	 * @param goal - the goal state 
+	 * @param multi - set this to true if there are free tiles in the goal state
+	 * @return
+	 */
+	public boolean isGoal(PState goal, boolean multi)
+	{	
+		if(!multi)
+			return this.equals(goal);
+		
+		if(goal == null)
+			return false;
+		
+		if(grid.length != goal.grid.length)
+			return false;
+		
+		for(int i = 0; i < grid.length; i++)
+		{
+			if((grid[i] != goal.grid[i]) && (goal.grid[i] != FREE))
+				return false;
+		}
+		
+		return true;
 	}
 	
 	/**
@@ -145,6 +198,12 @@ public class PState
 			currState = currState.parent;
 		}
 		return path;
+	}
+	
+	@Override
+	public int hashCode()
+	{
+		return Arrays.hashCode(grid);
 	}
 	
 	/**
