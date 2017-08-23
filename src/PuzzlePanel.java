@@ -24,10 +24,6 @@ public class PuzzlePanel extends JPanel
 
 	private AState anim;
 
-	private LinkedList<PState> idaPath;
-
-	private int mCount;
-
 	/**
 	 * Constructs the PuzzlePanel. Sets preferredSize to pSize.
 	 */
@@ -36,12 +32,10 @@ public class PuzzlePanel extends JPanel
 		super();
 		loaded = null;
 		pSize = new Dimension(Constants.DEFAULT_WIDTH, Constants.DEFAULT_HEIGHT);
-		grid = new Tile[Options.GRID_ROOT][Options.GRID_ROOT];
-		positions = new Point[Options.GRID_ROOT][Options.GRID_ROOT];
-		emptyLoc = new Location();
+		grid = null;
+		positions = null;
+		emptyLoc = null;
 		anim = new AState();
-		idaPath = null;
-		mCount = 0;
 		setPreferredSize(pSize);
 	}
 
@@ -52,10 +46,11 @@ public class PuzzlePanel extends JPanel
 	 * @param p - The point the user clicked within the panel.
 	 * @return true if successful false otherwise.
 	 */
-	public boolean makeMove(Point p)
+	public boolean playerMove(Point p)
 	{
-		mCount++;
-		System.out.println(mCount);
+		if(p == null || emptyLoc == null || grid == null)
+			return false;
+		
 		// Calculate the index of the selected tile.
 		int width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 		int row = p.y/height, col = p.x/width;
@@ -64,8 +59,9 @@ public class PuzzlePanel extends JPanel
 				diffCol = Math.abs(emptyLoc.col - col);
 		if((diffRow == 1 && diffCol == 0) || (diffCol == 1 && diffRow == 0))
 		{
+			Tile temp = grid[emptyLoc.row][emptyLoc.col];
 			grid[emptyLoc.row][emptyLoc.col] = grid[row][col];
-			grid[row][col] = null;
+			grid[row][col] = temp;
 			emptyLoc.row = row;
 			emptyLoc.col = col;
 			emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
@@ -82,8 +78,11 @@ public class PuzzlePanel extends JPanel
 	 * @param direction - the direction the empty tile will move 
 	 * @return true if successful false otherwise.
 	 */
-	public Location makeMove(byte direction)
+	public Location computerMove(byte direction)
 	{
+		if(emptyLoc == null || grid == null)
+			return null;
+		
 		Location loc = null;
 		boolean success = false;
 		int row = -1, col = -1;
@@ -128,13 +127,35 @@ public class PuzzlePanel extends JPanel
 		if(success)
 		{
 			loc = new Location(emptyLoc.row, emptyLoc.col, 0);
+			Tile temp = grid[emptyLoc.row][emptyLoc.col];
 			grid[emptyLoc.row][emptyLoc.col] = grid[row][col];
-			grid[row][col] = null;
+			grid[row][col] = temp;
 			emptyLoc.row = row;
 			emptyLoc.col = col;
 			emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
 		}
 		return loc;
+	}
+	
+	public boolean goalCheck()
+	{
+		if(grid == null)
+			return false;
+		
+		for(int i = 0; i < grid.length; i++)
+		{
+			for(int j = 0; j < grid[i].length; j++)
+			{
+				Location loc = grid[i][j].getTrueLoc();
+				if(loc.row != i || loc.col != j)
+					return false;
+			}
+		}
+		
+		grid[emptyLoc.row][emptyLoc.col].empty = false;
+		emptyLoc = null;
+		
+		return true;
 	}
 
 	/**
@@ -142,11 +163,14 @@ public class PuzzlePanel extends JPanel
 	 */
 	public void scramble()
 	{
+		if(grid == null || emptyLoc == null)
+			return;
+		
 		Random rand = new Random();
 		int oldPos = -1; // Tracks the old position to prevent undoing a move.
 		boolean conflict; // For checking another move in case of a conflict.
 
-		for(int i = 0; i < 2*Options.GRID_ROOT*Options.GRID_ROOT; i++)
+		for(int i = 0; i < 4*Options.GRID_ROOT*Options.GRID_ROOT; i++)
 		{
 			int vhflag = rand.nextInt(2); // Choose between vertical or horizontal selection.
 			int row = 0, col = 0, pos = 0;
@@ -234,8 +258,9 @@ public class PuzzlePanel extends JPanel
 				}
 			}
 
+			Tile temp = grid[emptyLoc.row][emptyLoc.col];
 			grid[emptyLoc.row][emptyLoc.col] = grid[row][col];
-			grid[row][col] = null;
+			grid[row][col] = temp;
 			emptyLoc.row = row;
 			emptyLoc.col = col;
 
@@ -244,10 +269,13 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 
-
 	public void solve()
 	{
+		if(grid == null || emptyLoc == null)
+			return;
+		
 		SliderPuzzle.inAnimation = true;
+		Solver sol = new Solver();
 
 		// Convert the current grid configuration into state form.
 		byte[] rootGrid = new byte[Options.GRID_ROOT*Options.GRID_ROOT];
@@ -259,7 +287,7 @@ public class PuzzlePanel extends JPanel
 			for(int j = 0; j < grid[i].length; j++)
 			{
 				pos = (byte) (i*Options.GRID_ROOT + j);
-				if(grid[i][j] != null)
+				if(grid[i][j].empty == false)
 				{
 					rootGrid[pos] = (byte)grid[i][j].getTrueLoc().pos;
 				}
@@ -272,202 +300,45 @@ public class PuzzlePanel extends JPanel
 		}
 
 		PState root = new PState(rootGrid, rEmpty, (short)0, null);
-		solve(Options.GRID_ROOT, root);
-	}
-
-
-	private void solve(int n, PState root)
-	{
-		PState goal;
-		if(n > 3)
-		{
-			byte[]goalGrid = new byte[Options.GRID_ROOT*Options.GRID_ROOT];
-			int goalDepth = Options.GRID_ROOT - n;
-			for(int i = 0, j = 0, depth = 0; depth < Options.GRID_ROOT;)
-			{
-				if(depth <= goalDepth)
-				{
-					goalGrid[i] = (byte)i;
-					goalGrid[j] = (byte)j;
-				}
-				else
-				{
-					goalGrid[i] = PState.FREE;
-					goalGrid[j] = PState.FREE;
-				}
-				
-				i++; 
-				j += Options.GRID_ROOT;
-				if(i >= depth*Options.GRID_ROOT + Options.GRID_ROOT)
-				{
-					depth++;
-					i = depth*Options.GRID_ROOT + depth;
-					j = i;
-				}
-			}
-			
-			goal = new PState(goalGrid, (byte)(goalGrid.length - 1), (short)0, null);
-			PState solution;
-			if(n > 4)
-				solution = idastarSearch(root,goal,true);
-			else
-				solution = idastarSearch(root,goal,true);
-			solve(n-1, solution);
-		}
-		else
-		{
-			// Set up the goal state.
-			byte[] goalGrid = new byte[Options.GRID_ROOT*Options.GRID_ROOT];
-			for(byte i = 0; i < goalGrid.length - 1; i++)
-			{
-				goalGrid[i] = i;
-			}
-
-			goalGrid[goalGrid.length - 1] = -1;
-			goal = new PState(goalGrid, (byte)(goalGrid.length - 1), (short)0, null);
-						
-			PState solution = bestFirstSearch(root, goal,true,false);
-			anim.path = solution.constructPath();
+		PState solution = sol.solve(root, grid[emptyLoc.row][emptyLoc.col].getTrueLoc().pos);
 		
-			String pString = "[";
-			for(Byte dir: anim.path)
+		anim.path = solution.constructPath();
+		
+		String pString = "[";
+		for(Byte dir: anim.path)
+		{
+			switch(dir.byteValue())
 			{
-				switch(dir.byteValue())
-				{
-				case Constants.LEFT:
-					pString += "LEFT";
-					break;
-				case Constants.RIGHT:
-					pString +="RIGHT";
-					break;
-				case Constants.UP:
-					pString += "UP";
-					break;
-				case Constants.DOWN:
-					pString += "DOWN";
-					break;
-				default:
-					break;
-				}
-				pString += ", ";
+			case Constants.LEFT:
+				pString += "LEFT";
+				break;
+			case Constants.RIGHT:
+				pString +="RIGHT";
+				break;
+			case Constants.UP:
+				pString += "UP";
+				break;
+			case Constants.DOWN:
+				pString += "DOWN";
+				break;
+			default:
+				break;
 			}
-
-			pString += "]";
-
-			System.out.println(pString);
-
-			System.out.println(anim.path.size());
-
-			animateSolution();
+			pString += ", ";
 		}
+
+		pString += "]";
+
+		System.out.println(pString);
+
+		System.out.println(anim.path.size());
+
+		animateSolution();
 	}
-
-	public PState bestFirstSearch(PState root, PState goal, boolean astar, boolean multi)
-	{
-		// Priority queue of possible solutions.
-		PriorityQueue<PState> open; 
-
-		// Perform A* search
-		if(astar)
-		{
-			open = new PriorityQueue<PState>(10, new Comparator<PState>()
-			{
-				// Computes f(n) = g(n) + h(n). Actual cost from root to curr + estimated cost to goal.
-				@Override
-				public int compare(PState s1, PState s2)
-				{
-					int f1 = s1.g + s1.h;
-					int f2 = s2.g + s2.h;
-					return f1 - f2;
-				}
-			});
-		}
-		else // Perform a best first search similar to A* without considering g(n)
-		{
-			open = new PriorityQueue<PState>(10, new Comparator<PState>()
-			{
-				// Computes f(n) = h(n). Estimated cost to goal.
-				@Override
-				public int compare(PState s1, PState s2)
-				{
-					int f1 = s1.h;
-					int f2 = s2.h;
-					return f1 - f2;
-				}
-			});
-		}
-
-
-		// List of states already checked.
-		HashSet<PState> closed = new HashSet<PState>();
-
-		PState currState = root;
-		while(!currState.isGoal(goal, multi))
-		{
-			ArrayList<PState> successors = currState.genSuccessors();
-			for(PState state: successors)
-			{
-				if(!closed.contains(state))
-				{
-					open.add(state);
-				}
-			}
-
-			closed.add(currState);
-			currState = open.poll();
-		}
-
-		return currState;
-	}
-
-	public PState idastarSearch(PState root, PState goal, boolean multi)
-	{
-		int FOUND = -1;
-		idaPath = new LinkedList<PState>();
-		idaPath.push(root);
-
-		int thresh = root.h;
-		int t = Integer.MAX_VALUE;
-
-		while(t != FOUND)
-		{
-			t = dfs(root, goal, thresh, multi);
-			thresh = t;
-		}
-
-		return idaPath.pop(); //Not the best way to do it.
-	}
-
-	private int dfs(PState state, PState goal, int thresh, boolean multi)
-	{	
-		int f = state.g + state.h;
-		if(f > thresh)
-			return f;
-		if(state.isGoal(goal, multi))
-			return -1;
-
-		int min = Integer.MAX_VALUE;
-		for(PState p: state.genSuccessors())
-		{
-			if(!idaPath.contains(p))
-			{	
-				idaPath.push(p);
-				int t = dfs(p,goal,thresh, multi);
-				if(t == -1)
-					return -1;
-				if(t < min)
-					min = t;
-				idaPath.pop();
-			}
-		}
-
-		return min;
-	}
-
-
+	
 	public void animateSolution()
 	{
-		if(anim.path == null)
+		if(anim.path == null || grid == null || positions == null)
 			return;
 
 		anim.timer = new Timer(100, null);
@@ -482,11 +353,14 @@ public class PuzzlePanel extends JPanel
 					if(anim.dir == null)
 					{
 						anim.timer.stop();
+						grid[emptyLoc.row][emptyLoc.col].empty = false;
+						emptyLoc = null;
 						SliderPuzzle.inAnimation = false;
+						repaint();
 					}
 					else
 					{
-						anim.loc = makeMove(anim.dir);
+						anim.loc = computerMove(anim.dir);
 						anim.tilePos = positions[anim.loc.row][anim.loc.col];
 						anim.tile = grid[anim.loc.row][anim.loc.col];
 						anim.gx = anim.tilePos.x;
@@ -516,7 +390,7 @@ public class PuzzlePanel extends JPanel
 
 
 						// Should change magic numbers to constants. ****************************
-						anim.rate = .2;
+						anim.rate = .5;
 						anim.finish = false;
 					}
 				}
@@ -597,6 +471,9 @@ public class PuzzlePanel extends JPanel
 
 	public void loadImage(BufferedImage image)
 	{
+		if (image == null)
+			return;
+		
 		// Create BufferedImage and get graphics context.
 		loaded = new BufferedImage(pSize.width, pSize.height, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g2d = loaded.createGraphics();
@@ -610,6 +487,16 @@ public class PuzzlePanel extends JPanel
 
 		g2d.drawRenderedImage(image, Tx);
 
+		splitImage();
+	}
+	
+	public void splitImage()
+	{
+		emptyLoc = null;
+		
+		grid = new Tile[Options.GRID_ROOT][Options.GRID_ROOT];
+		positions = new Point[Options.GRID_ROOT][Options.GRID_ROOT];
+		
 		// Split the image into 9 Tiles with the last being empty.
 		int x = 0, y = 0, width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 		for(int i = 0; i < grid.length; i++)
@@ -617,7 +504,7 @@ public class PuzzlePanel extends JPanel
 			for(int j = 0; j < grid[i].length; j++)
 			{
 				// Ordering from left to right top to bottom
-				grid[i][j] = new Tile(x,y,width,height, new Location(i,j, i*Options.GRID_ROOT + j));
+				grid[i][j] = new Tile(x,y,width,height, new Location(i,j, i*Options.GRID_ROOT + j), false);
 				positions[i][j] = new Point(x,y);
 				x += width;
 			}
@@ -625,11 +512,25 @@ public class PuzzlePanel extends JPanel
 			x = 0;
 			y += height;
 		}
-
-		emptyLoc.row = grid.length - 1;
-		emptyLoc.col = grid.length -1;
+	}
+	
+	public void setEmptyLoc(Point p)
+	{
+		if(grid == null)
+			return;
+		
+		int width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
+		
+		emptyLoc = new Location();
+		emptyLoc.row = p.y/height;
+		emptyLoc.col = p.x/width;
 		emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
-		grid[emptyLoc.row][emptyLoc.col] = null;
+		grid[emptyLoc.row][emptyLoc.col].empty = true;
+	}
+	
+	public Location getEmptyLoc()
+	{
+		return emptyLoc;
 	}
 
 	@Override
@@ -647,7 +548,7 @@ public class PuzzlePanel extends JPanel
 				for(int j = 0; j < grid[i].length; j++)
 				{
 					Tile tile = grid[i][j];
-					if(tile != null)
+					if(tile.empty != true)
 						g.drawImage(loaded.getSubimage(tile.x, tile.y, tile.width, tile.height), positions[i][j].x, positions[i][j].y, null);
 
 					//x += width;
