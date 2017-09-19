@@ -18,11 +18,11 @@ public class PuzzlePanel extends JPanel
 	private BufferedImage loaded; // Loaded Image scaled to the Dimension of this panel.
 	private Dimension pSize; // Dimension of this panel.
 
-	private Tile grid[][]; // The grid for the puzzle game empty tile is set to null.
+	private Tile grid[][]; // The grid for the puzzle game.
 	private Point positions[][]; // Position on panel the corresponding tile in grid will be drawn.
 	private Location emptyLoc; // Location representing empty tile.
 
-	private AState anim;
+	private Tile highlight; // The tile that will have a highlight around it.
 
 	/**
 	 * Constructs the PuzzlePanel. Sets preferredSize to pSize.
@@ -31,11 +31,13 @@ public class PuzzlePanel extends JPanel
 	{
 		super();
 		loaded = null;
-		pSize = new Dimension(Constants.DEFAULT_WIDTH, Constants.DEFAULT_HEIGHT);
-		grid = null;
-		positions = null;
+		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+		pSize = new Dimension((int)(screenSize.width/Constants.fracWidth), 
+								(int)(screenSize.height/Constants.fracHeight));
+		grid = new Tile[Options.GRID_ROOT][Options.GRID_ROOT];
+		positions = new Point[Options.GRID_ROOT][Options.GRID_ROOT];
 		emptyLoc = null;
-		anim = new AState();
+		highlight = null;
 		setPreferredSize(pSize);
 	}
 
@@ -48,25 +50,31 @@ public class PuzzlePanel extends JPanel
 	 */
 	public boolean playerMove(Point p)
 	{
-		if(p == null || emptyLoc == null || grid == null)
+		if(p == null || emptyLoc == null || loaded == null)
 			return false;
 		
 		// Calculate the index of the selected tile.
 		int width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 		int row = p.y/height, col = p.x/width;
-
-		int diffRow = Math.abs(emptyLoc.row - row),
-				diffCol = Math.abs(emptyLoc.col - col);
-		if((diffRow == 1 && diffCol == 0) || (diffCol == 1 && diffRow == 0))
+		if(row < grid.length && col < grid.length)
 		{
-			Tile temp = grid[emptyLoc.row][emptyLoc.col];
-			grid[emptyLoc.row][emptyLoc.col] = grid[row][col];
-			grid[row][col] = temp;
-			emptyLoc.row = row;
-			emptyLoc.col = col;
-			emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
+			int diffRow = Math.abs(emptyLoc.row - row),
+					diffCol = Math.abs(emptyLoc.col - col);
+			if((diffRow == 1 && diffCol == 0) || (diffCol == 1 && diffRow == 0))
+			{
+				Tile temp = grid[emptyLoc.row][emptyLoc.col];
+				grid[emptyLoc.row][emptyLoc.col] = grid[row][col];
+				grid[row][col] = temp;
+				emptyLoc.row = row;
+				emptyLoc.col = col;
+				emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
 
-			return true;
+				return true;
+			}
+			else if(diffRow == 0 && diffCol == 0)
+			{
+				return true;
+			}
 		}
 
 		return false;
@@ -80,7 +88,7 @@ public class PuzzlePanel extends JPanel
 	 */
 	public Location computerMove(byte direction)
 	{
-		if(emptyLoc == null || grid == null)
+		if(emptyLoc == null || loaded == null)
 			return null;
 		
 		Location loc = null;
@@ -139,7 +147,7 @@ public class PuzzlePanel extends JPanel
 	
 	public boolean goalCheck()
 	{
-		if(grid == null)
+		if(emptyLoc == null || loaded == null)
 			return false;
 		
 		for(int i = 0; i < grid.length; i++)
@@ -151,10 +159,7 @@ public class PuzzlePanel extends JPanel
 					return false;
 			}
 		}
-		
-		grid[emptyLoc.row][emptyLoc.col].empty = false;
-		emptyLoc = null;
-		
+
 		return true;
 	}
 
@@ -163,8 +168,18 @@ public class PuzzlePanel extends JPanel
 	 */
 	public void scramble()
 	{
-		if(grid == null || emptyLoc == null)
+		if(loaded == null)
 			return;
+		
+		if(emptyLoc == null)
+		{
+			emptyLoc = new Location();
+			emptyLoc.row = grid.length - 1;
+			emptyLoc.col = grid.length - 1;
+			emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
+			
+			grid[emptyLoc.row][emptyLoc.col].empty = true;
+		}
 		
 		Random rand = new Random();
 		int oldPos = -1; // Tracks the old position to prevent undoing a move.
@@ -269,12 +284,11 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 
-	public void solve()
+	public LinkedList<Byte> solve()
 	{
-		if(grid == null || emptyLoc == null)
-			return;
+		if(loaded == null || emptyLoc == null)
+			return null;
 		
-		SliderPuzzle.inAnimation = true;
 		Solver sol = new Solver();
 
 		// Convert the current grid configuration into state form.
@@ -302,10 +316,11 @@ public class PuzzlePanel extends JPanel
 		PState root = new PState(rootGrid, rEmpty, (short)0, null);
 		PState solution = sol.solve(root, grid[emptyLoc.row][emptyLoc.col].getTrueLoc().pos);
 		
-		anim.path = solution.constructPath();
+		
+		LinkedList<Byte> path = solution.constructPath();
 		
 		String pString = "[";
-		for(Byte dir: anim.path)
+		for(Byte dir: path)
 		{
 			switch(dir.byteValue())
 			{
@@ -331,134 +346,12 @@ public class PuzzlePanel extends JPanel
 
 		System.out.println(pString);
 
-		System.out.println(anim.path.size());
+		System.out.println(path.size());
 
-		animateSolution();
+		return path;
+		//animateSolution();
 	}
 	
-	public void animateSolution()
-	{
-		if(anim.path == null || grid == null || positions == null)
-			return;
-
-		anim.timer = new Timer(100, null);
-		ActionListener al = new ActionListener() 
-		{
-			@Override
-			public void actionPerformed(ActionEvent ae) 
-			{
-				if(anim.finish)
-				{
-					anim.dir = anim.path.poll();
-					if(anim.dir == null)
-					{
-						anim.timer.stop();
-						grid[emptyLoc.row][emptyLoc.col].empty = false;
-						emptyLoc = null;
-						SliderPuzzle.inAnimation = false;
-						repaint();
-					}
-					else
-					{
-						anim.loc = computerMove(anim.dir);
-						anim.tilePos = positions[anim.loc.row][anim.loc.col];
-						anim.tile = grid[anim.loc.row][anim.loc.col];
-						anim.gx = anim.tilePos.x;
-						anim.gy = anim.tilePos.y;
-
-						switch(anim.dir.byteValue())
-						{
-						case Constants.LEFT:
-							anim.tilePos.x = anim.gx - anim.tile.width;
-							anim.animation = -.99;
-							break;
-						case Constants.RIGHT:
-							anim.tilePos.x = anim.gx + anim.tile.width;
-							anim.animation = .99;
-							break;
-						case Constants.UP:
-							anim.tilePos.y = anim.gy - anim.tile.height;
-							anim.animation = -.99;
-							break;
-						case Constants.DOWN:
-							anim.tilePos.y = anim.gy + anim.tile.height;
-							anim.animation = .99;
-							break;
-						default:
-							break;
-						}
-
-
-						// Should change magic numbers to constants. ****************************
-						anim.rate = .5;
-						anim.finish = false;
-					}
-				}
-				else
-				{
-					switch(anim.dir.byteValue())
-					{
-					case Constants.LEFT:
-						if(anim.tilePos.x < anim.gx)
-						{
-							anim.tilePos.x = anim.gx + (int)(anim.animation*anim.tile.width);
-							anim.animation += anim.rate;
-						}
-						else
-						{
-							anim.tilePos.x = anim.gx;
-							anim.finish = true;
-						}
-						break;
-					case Constants.RIGHT:
-						if(anim.tilePos.x > anim.gx)
-						{
-							anim.tilePos.x = anim.gx + (int)(anim.animation*anim.tile.width);
-							anim.animation -= anim.rate;
-						}
-						else
-						{
-							anim.tilePos.x = anim.gx;
-							anim.finish = true;
-						}
-						break;
-					case Constants.UP:
-						if(anim.tilePos.y < anim.gy)
-						{
-							anim.tilePos.y = anim.gy + (int)(anim.animation*anim.tile.height);
-							anim.animation += anim.rate;
-						}
-						else
-						{
-							anim.tilePos.y = anim.gy;
-							anim.finish = true;
-						}
-						break;
-					case Constants.DOWN:
-						if(anim.tilePos.y > anim.gy)
-						{
-							anim.tilePos.y = anim.gy + (int)(anim.animation*anim.tile.height);
-							anim.animation -= anim.rate;
-						}
-						else
-						{
-							anim.tilePos.y = anim.gy;
-							anim.finish = true;
-						}
-						break;
-					default:
-						break;
-					}
-
-					repaint();
-				}
-			}
-		};
-
-		anim.timer.addActionListener(al);
-		anim.timer.start();
-	}
-
 	/**
 	 * Returns loaded image file.
 	 * 
@@ -514,33 +407,91 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 	
+	public void unsetHighlight()
+	{
+		highlight = null;
+	}
+	
+	public void setHighlight(Point p)
+	{
+		if(p == null || loaded == null)
+			return;
+		
+		unsetHighlight();
+		int width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
+		
+		int row = p.y/height, col = p.x/width;
+		
+		if(row < grid.length && col < grid.length)
+			highlight = grid[row][col];
+	}
+	
 	public void setEmptyLoc(Point p)
 	{
-		if(grid == null)
+		if(p == null || loaded == null)
 			return;
 		
 		int width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 		
-		emptyLoc = new Location();
-		emptyLoc.row = p.y/height;
-		emptyLoc.col = p.x/width;
-		emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
-		grid[emptyLoc.row][emptyLoc.col].empty = true;
+		int row = p.y/height, col = p.x/width;
+		
+		if(row < grid.length && col < grid.length)
+		{
+			emptyLoc = new Location();
+			emptyLoc.row = row;
+			emptyLoc.col = col;
+			emptyLoc.pos = emptyLoc.row*Options.GRID_ROOT + emptyLoc.col;
+			grid[emptyLoc.row][emptyLoc.col].empty = true;
+		}
+	}
+	
+	public void resetEmpty()
+	{
+		if (emptyLoc == null)
+			return;
+		
+		grid[emptyLoc.row][emptyLoc.col].empty = false;
+		emptyLoc = null;
 	}
 	
 	public Location getEmptyLoc()
 	{
 		return emptyLoc;
 	}
+	
+	public Dimension getDimensions()
+	{
+		return pSize;
+	}
+	
+	public Point getPosition(int row, int col)
+	{
+		if(row < positions.length && col < positions.length)
+			return positions[row][col];
+		else
+			return null;
+	}
+	
+	public Tile getTile(int row, int col)
+	{
+		if(row < grid.length && col < grid.length)
+			return grid[row][col].getCopy();
+		else
+			return null;
+	}
 
 	@Override
 	public void paintComponent(Graphics g)
 	{
+		if(g == null)
+			return;
+		
 		super.paintComponent(g);
 		if(loaded != null)
 		{
 			g.clearRect(0, 0, pSize.width, pSize.height);
 
+			int hposx = 0, hposy = 0;
 			// Draw each Tile in order.
 			//int x = 0, y = 0, width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 			for(int i = 0; i < grid.length; i++)
@@ -550,12 +501,28 @@ public class PuzzlePanel extends JPanel
 					Tile tile = grid[i][j];
 					if(tile.empty != true)
 						g.drawImage(loaded.getSubimage(tile.x, tile.y, tile.width, tile.height), positions[i][j].x, positions[i][j].y, null);
-
+					
+					if(tile == highlight)
+					{
+						hposx = positions[i][j].x;
+						hposy = positions[i][j].y;
+					}
 					//x += width;
 				}
-
 				//x = 0;
 				//y += height;
+			}
+			
+			if(highlight != null)
+			{
+				Graphics2D g2d = (Graphics2D) g;
+				Color oldc = g2d.getColor();
+				Stroke olds = g2d.getStroke();
+				g2d.setColor(new Color(255,255,0));
+				g2d.setStroke(new BasicStroke(5));
+				g2d.drawRect(hposx, hposy, highlight.width, highlight.height); 
+				g2d.setStroke(olds);
+				g2d.setColor(oldc);
 			}
 		}
 	}

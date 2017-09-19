@@ -6,6 +6,9 @@ public class Tile
 	
 	public Tile(Location trueLoc)
 	{
+		if(trueLoc == null)
+			trueLoc = new Location();
+		
 		this.trueLoc = trueLoc;
 		x = 0;
 		y = 0;
@@ -16,6 +19,9 @@ public class Tile
 	
 	public Tile(int x, int y, int width, int height, Location trueLoc, boolean empty)
 	{
+		if(trueLoc == null)
+			trueLoc = new Location();
+		
 		this.trueLoc = trueLoc;
 		this.x = x;
 		this.y = y;
@@ -27,5 +33,11 @@ public class Tile
 	public Location getTrueLoc()
 	{
 		return trueLoc;
+	}
+	
+	public Tile getCopy()
+	{
+		Location loc = new Location(trueLoc.row, trueLoc.col, trueLoc.pos);
+		return new Tile(x,y,width,height,loc,empty);
 	}
 }

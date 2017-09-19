@@ -49,6 +49,29 @@ public class PState
 	}
 	
 	/**
+	 * Determines if a state excluding itself is in this states path.
+	 * 
+	 * @param state - state to search for
+	 * @return true if in path false otherwise
+	 */
+	public boolean inPath(PState state)
+	{
+		if(state == null)
+			return false;
+		
+		PState curr = this.parent;
+		while(curr != null)
+		{
+			if(curr.equals(state))
+				return true;
+			
+			curr = curr.parent;
+		}
+		
+		return false;
+	}
+	
+	/**
 	 * Computes Manhattan distance (horizontal distance + vertical distance) of state to goal.
 	 * 
 	 * @param state - array representing the state of the board.
@@ -214,6 +237,9 @@ public class PState
 	@Override
 	public boolean equals(Object obj)
 	{
+		if(obj == null)
+			return false;
+		
 		boolean isEqual = false;
 		
 		PState state = null;

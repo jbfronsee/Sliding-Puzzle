@@ -6,35 +6,37 @@ import java.util.PriorityQueue;
 
 public class Solver {
 
-private PState root;
-private PState goal;
+	private static final int FOUND = -1;
 
-boolean optimal;
-boolean multi;
+	private PState root;
+	private PState goal;
 
-private LinkedList<PState> path;
-	
-public Solver()
-{
-	root = null;
-	goal = null;
-	optimal = true;
-	multi = false;
-}
+	boolean optimal;
+	boolean multi;
 
-public PState solve(PState root, int goalEmpty)
-{
-	this.root = root;
-	return solve(Options.GRID_ROOT, goalEmpty);
-}
+	public Solver()
+	{
+		root = null;
+		goal = null;
+		optimal = true;
+		multi = false;
+	}
+
+	public PState solve(PState root, int goalEmpty)
+	{
+		if(root == null)
+			return null;
+		
+		this.root = root;
+		return solve(Options.GRID_ROOT, goalEmpty);
+	}
 
 	private PState solve(int n, int goalEmpty)
 	{
-	
 		if(n > 3)
 		{
 			multi = true;
-			
+
 			byte[]goalGrid = new byte[Options.GRID_ROOT*Options.GRID_ROOT];
 			int goalDepth = Options.GRID_ROOT - n;
 			for(int i = 0, j = 0, depth = 0; depth < Options.GRID_ROOT;)
@@ -49,7 +51,7 @@ public PState solve(PState root, int goalEmpty)
 					goalGrid[i] = PState.FREE;
 					goalGrid[j] = PState.FREE;
 				}
-				
+
 				i++; 
 				j += Options.GRID_ROOT;
 				if(i >= depth*Options.GRID_ROOT + Options.GRID_ROOT)
@@ -59,23 +61,23 @@ public PState solve(PState root, int goalEmpty)
 					j = i;
 				}
 			}
-			
+
 			goalGrid[goalEmpty] = (goalGrid[goalEmpty] == PState.FREE) ? PState.FREE : PState.EMPTY;
-			
+
 			goal = new PState(goalGrid, (byte)goalEmpty, (short)0, null);
-			
+
 			PState solution;
-			if(n > 4)
+			if(n > 3)
 			{
 				optimal = false;
-				
+
 				solution = idastarSearch();
 				root = solution;
 			}
 			else
 			{
 				optimal = true;
-				
+
 				solution = idastarSearch();
 				root = solution;
 			}
@@ -92,16 +94,16 @@ public PState solve(PState root, int goalEmpty)
 
 			goalGrid[goalEmpty] = PState.EMPTY;
 			goal = new PState(goalGrid, (byte)(goalEmpty), (short)0, null);
-			
+
 			optimal = true;
 			multi = false;
-			
+
 			PState solution = astarSearch();
 			return solution;
 		}
 	}
-	
-	
+
+
 
 	private PState astarSearch()
 	{
@@ -123,7 +125,7 @@ public PState solve(PState root, int goalEmpty)
 				}
 			});
 		}
-		else // Perform A* search with out an admissible heuristic. Improves speed of the search.
+		else // Perform A* search with out an admissible heuristic. Improves speed of the search without optimality.
 		{
 			open = new PriorityQueue<PState>(10, new Comparator<PState>()
 			{
@@ -163,50 +165,54 @@ public PState solve(PState root, int goalEmpty)
 
 	private PState idastarSearch()
 	{
-		int FOUND = -1;
-		path = new LinkedList<PState>();
-		path.push(root);
+		/*path = new LinkedList<PState>();
+		path.push(root);*/
+		
+		PState state = null;
 
 		int thresh = root.h;
-		int t = Integer.MAX_VALUE;
-
-		while(t != FOUND)
+		while(thresh != FOUND && thresh < Integer.MAX_VALUE)
 		{
-			t = dfs(root, thresh);
-			thresh = t;
-		}
+			//result = dfs(root, thresh);
 
-		return path.pop();
-	}
+			int min = Integer.MAX_VALUE;
 
-	private int dfs(PState state, int thresh)
-	{	
-		int f;
-		if(optimal)
-			f = state.g + state.h;
-		else
-			f = state.g + 2*state.h;
-		if(f > thresh)
-			return f;
-		if(state.isGoal(goal, multi))
-			return -1;
+			LinkedList<PState> stack = new LinkedList<PState>();
+			stack.push(root);
+			while(!stack.isEmpty())
+			{
+				state = stack.pop();
+				if(!state.inPath(state))
+				{
+					int f;
+					if(optimal)
+						f = state.g + state.h;
+					else
+						f = state.g + 2*state.h;
 
-		int min = Integer.MAX_VALUE;
-		for(PState p: state.genSuccessors())
-		{
-			if(!path.contains(p))
-			{	
-				path.push(p);
-				int t = dfs(p,thresh);
-				if(t == -1)
-					return -1;
-				if(t < min)
-					min = t;
-				path.pop();
+					if(f > thresh)
+					{
+						if(f < min)
+							min = f;
+					}
+					else
+					{
+
+						if(state.isGoal(goal, multi))
+						{
+							thresh = FOUND;
+							break;
+						}
+						
+						stack.addAll(0, state.genSuccessors());
+					}
+				}
 			}
+			
+			if(thresh != FOUND)
+				thresh = min;
 		}
 
-		return min;
+		return state;
 	}
-
 }
