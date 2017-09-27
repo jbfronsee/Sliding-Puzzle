@@ -2,50 +2,90 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 
+/**
+ * Represents the state of the n-puzzle. Primarily as
+ * the position of tiles on the grid.
+ * 
+ * @author joshua
+ *
+ */
 public class PState
 {
-	public static final byte EMPTY = -1;
+	// Variables for multi goal representation.
+	public static final byte EMPTY = -1; 
 	public static final byte FREE = -2;
 	
-	public byte move; // Represents the move taken to get to this state.
+	private byte move; // Represents the move taken to get to this state.
 	
-	public byte grid[]; // The state representation of the grid.
-	public byte empty; // Location of the empty square.
-	public short g; // Actual cost to get to this state.
-	public short h; // Projected cost to get to goal state.
+	private byte grid[]; // The state representation of the grid.
+	private byte empty; // Location of the empty square.
+	private short g; // Actual cost to get to this state.
+	private short h; // Projected cost to get to goal state.
 	
 	private PState parent; // Parent state of this state.
-	//private PState child;
 	
-	public PState(byte grid[], byte empty, short g, PState parent)
+	/**
+	 * Constructor for PState creating a root state.
+	 * 
+	 * @param grid
+	 * @param empty
+	 * @param g
+	 * @param parent
+	 */
+	public PState(byte grid[], byte empty)
 	{
 		this.grid = grid;
 		this.empty = empty;
-		this.g = g;
-		this.parent = parent;
+		this.g = 0;
+		this.parent = null;
 		this.h = computeHeuristic();
 		this.move = Constants.NONE;
 	}
 	
-	public PState(byte grid[], byte empty, short g, PState parent, byte move)
+	/**
+	 * Constructor for PState used by genSuccessors().
+	 * 
+	 * @param grid
+	 * @param empty
+	 * @param g
+	 * @param parent
+	 * @param move
+	 */
+	private PState(byte grid[], byte empty, short g, PState parent, byte move)
 	{
-		this(grid,empty,g,parent);
+		this(grid,empty);
+		this.g = g;
+		this.parent = parent;
 		this.move = move;
 	}
 	
-/*	public void setChild(PState child)
-	{
-		this.child = child;
-	}
-	
-	public PState getChild()
-	{
-		return child;
-	}*/
-	
+	/**
+	 * Returns parent.
+	 * 
+	 * @return PState parent
+	 */
 	public PState getParent()
 	{
 		return parent;
+	}
+	
+	/**
+	 * Returns g.
+	 * 
+	 * @return int g
+	 */
+	public int getG()
+	{
+		return g;
+	}
+	/**
+	 * Returns h.
+	 * 
+	 * @return int h
+	 */
+	public int getH()
+	{
+		return h;
 	}
 	
 	/**
@@ -56,9 +96,6 @@ public class PState
 	 */
 	public boolean inPath(PState state)
 	{
-		if(state == null)
-			return false;
-		
 		PState curr = this.parent;
 		while(curr != null)
 		{
@@ -82,25 +119,33 @@ public class PState
 		short h = 0;
 		if(parent != null)
 		{
+			/* If there is a parent only compute the manhattan distance of the
+			 * moved tile and add or subtract it from the previous h.*/
 			int val, row, col, nRow, nCol, oRow, oCol, newDiff, oldDiff;
 		
 			h = parent.h;
 			
+			// Find the row and column of the actual value.
 			val = grid[parent.empty];
 			row = val/Options.GRID_ROOT;
 			col = val%Options.GRID_ROOT;
+			
+			// Find the new row/col and old row/col
 			nRow = parent.empty/Options.GRID_ROOT;
 			nCol = parent.empty%Options.GRID_ROOT;
 			oRow = this.empty/Options.GRID_ROOT;
 			oCol = this.empty%Options.GRID_ROOT;
 			
+			// Compute the new and old manhattan distances compared to actual.
 			newDiff = Math.abs(nRow - row) + Math.abs(nCol - col);
 			oldDiff = Math.abs(oRow - row) + Math.abs(oCol - col);
 			
+			// Add to old h if greater and subtract if smaller.
 			h += newDiff - oldDiff;
 		}
 		else
 		{
+			// Compute manhattan distance for every tile.
 			int row, col, tRow, tCol;
 			for(int i = 0; i < grid.length; i++)
 			{

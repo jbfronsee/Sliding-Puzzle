@@ -13,6 +13,12 @@ import java.util.Random;
 
 import javax.swing.*;
 
+/**
+ * An extended JPanel that creates an n-puzzle component.
+ * 
+ * @author joshua
+ *
+ */
 public class PuzzlePanel extends JPanel
 {
 	private BufferedImage loaded; // Loaded Image scaled to the Dimension of this panel.
@@ -84,7 +90,7 @@ public class PuzzlePanel extends JPanel
 	 * Moves the empty tile in a direction specified from Constants class.
 	 * 
 	 * @param direction - the direction the empty tile will move 
-	 * @return true if successful false otherwise.
+	 * @return loc - the old location of emptyLoc
 	 */
 	public Location computerMove(byte direction)
 	{
@@ -145,6 +151,12 @@ public class PuzzlePanel extends JPanel
 		return loc;
 	}
 	
+	/**
+	 * Checks if the board configuration is the goal (all
+	 * tiles are in their true location).
+	 * 
+	 * @return true if goal false otherwise.
+	 */
 	public boolean goalCheck()
 	{
 		if(emptyLoc == null || loaded == null)
@@ -185,7 +197,7 @@ public class PuzzlePanel extends JPanel
 		int oldPos = -1; // Tracks the old position to prevent undoing a move.
 		boolean conflict; // For checking another move in case of a conflict.
 
-		for(int i = 0; i < 4*Options.GRID_ROOT*Options.GRID_ROOT; i++)
+		for(int i = 0; i < Constants.NUM_PASSES*Options.GRID_ROOT*Options.GRID_ROOT; i++)
 		{
 			int vhflag = rand.nextInt(2); // Choose between vertical or horizontal selection.
 			int row = 0, col = 0, pos = 0;
@@ -284,6 +296,12 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 
+	/**
+	 * Solve the puzzle using Solver and return a list of moves to solve
+	 * the puzzle.
+	 * 
+	 * @return LinkedList<Byte> path to solve the puzzle.
+	 */
 	public LinkedList<Byte> solve()
 	{
 		if(loaded == null || emptyLoc == null)
@@ -307,48 +325,53 @@ public class PuzzlePanel extends JPanel
 				}
 				else
 				{
-					rootGrid[pos] = -1;
+					rootGrid[pos] = PState.EMPTY;
 					rEmpty = pos;
 				}
 			}
 		}
 
-		PState root = new PState(rootGrid, rEmpty, (short)0, null);
+		PState root = new PState(rootGrid, rEmpty);
 		PState solution = sol.solve(root, grid[emptyLoc.row][emptyLoc.col].getTrueLoc().pos);
 		
-		
-		LinkedList<Byte> path = solution.constructPath();
-		
-		String pString = "[";
-		for(Byte dir: path)
+		if(solution != null)
 		{
-			switch(dir.byteValue())
+		
+			LinkedList<Byte> path = solution.constructPath();
+		
+			String pString = "[";
+			for(Byte dir: path)
 			{
-			case Constants.LEFT:
-				pString += "LEFT";
-				break;
-			case Constants.RIGHT:
-				pString +="RIGHT";
-				break;
-			case Constants.UP:
-				pString += "UP";
-				break;
-			case Constants.DOWN:
-				pString += "DOWN";
-				break;
-			default:
-				break;
+				switch(dir.byteValue())
+				{
+				case Constants.LEFT:
+					pString += "LEFT";
+					break;
+				case Constants.RIGHT:
+					pString +="RIGHT";
+					break;
+				case Constants.UP:
+					pString += "UP";
+					break;
+				case Constants.DOWN:
+					pString += "DOWN";
+					break;
+				default:
+					break;
+				}
+				pString += ", ";
 			}
-			pString += ", ";
+
+			pString += "]";
+
+			System.out.println(pString);
+
+			System.out.println(path.size());
+
+			return path;
 		}
-
-		pString += "]";
-
-		System.out.println(pString);
-
-		System.out.println(path.size());
-
-		return path;
+		
+		return null;
 		//animateSolution();
 	}
 	
@@ -362,6 +385,11 @@ public class PuzzlePanel extends JPanel
 		return loaded;
 	}
 
+	/**
+	 * Loads a BufferedImage as a scaled image to panel dimensions.
+	 * 
+	 * @param image
+	 */
 	public void loadImage(BufferedImage image)
 	{
 		if (image == null)
@@ -383,6 +411,10 @@ public class PuzzlePanel extends JPanel
 		splitImage();
 	}
 	
+	/**
+	 * Splits the image into a nxn grid where n is Options.GRID_ROOT.
+	 * "Split" is stored as a 2D array of Tiles.
+	 */
 	public void splitImage()
 	{
 		emptyLoc = null;
@@ -407,11 +439,20 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 	
+	/**
+	 * Reset highlight to null.
+	 */
 	public void unsetHighlight()
 	{
 		highlight = null;
 	}
 	
+	/**
+	 * Set highlight to a tile that p lies in.
+	 * If p is not within the panel space does nothing.
+	 * 
+	 * @param Point p
+	 */
 	public void setHighlight(Point p)
 	{
 		if(p == null || loaded == null)
@@ -426,6 +467,11 @@ public class PuzzlePanel extends JPanel
 			highlight = grid[row][col];
 	}
 	
+	/**
+	 * Sets emptyLoc to the point p if it is within panel space.
+	 * 
+	 * @param Point p
+	 */
 	public void setEmptyLoc(Point p)
 	{
 		if(p == null || loaded == null)
@@ -445,6 +491,9 @@ public class PuzzlePanel extends JPanel
 		}
 	}
 	
+	/**
+	 * Resets empty to null.
+	 */
 	public void resetEmpty()
 	{
 		if (emptyLoc == null)
@@ -454,16 +503,34 @@ public class PuzzlePanel extends JPanel
 		emptyLoc = null;
 	}
 	
+	/**
+	 * Returns emptyLoc.
+	 * 
+	 * @return emptyLoc.
+	 */
 	public Location getEmptyLoc()
 	{
 		return emptyLoc;
 	}
 	
+	/**
+	 * Returns dimensions.
+	 * 
+	 * @return pSize
+	 */
 	public Dimension getDimensions()
 	{
 		return pSize;
 	}
 	
+	/**
+	 * Returns the positions of the tile at row and col.
+	 * 
+	 * @param row
+	 * @param col
+	 * @return Point on panel to draw Tile. Null if row and col
+	 * are out of bounds.
+	 */
 	public Point getPosition(int row, int col)
 	{
 		if(row < positions.length && col < positions.length)
@@ -472,6 +539,13 @@ public class PuzzlePanel extends JPanel
 			return null;
 	}
 	
+	/**
+	 * Returns a copy of the Tile in the grid.
+	 * 
+	 * @param row
+	 * @param col
+	 * @return Tile copy of tile. Null if row and col are out of bounds.
+	 */
 	public Tile getTile(int row, int col)
 	{
 		if(row < grid.length && col < grid.length)
@@ -480,6 +554,9 @@ public class PuzzlePanel extends JPanel
 			return null;
 	}
 
+	/**
+	 * Paints this panel. Draws Tiles at respective positions and highlight if present.
+	 */
 	@Override
 	public void paintComponent(Graphics g)
 	{
@@ -493,7 +570,6 @@ public class PuzzlePanel extends JPanel
 
 			int hposx = 0, hposy = 0;
 			// Draw each Tile in order.
-			//int x = 0, y = 0, width = pSize.width/Options.GRID_ROOT, height = pSize.height/Options.GRID_ROOT;
 			for(int i = 0; i < grid.length; i++)
 			{
 				for(int j = 0; j < grid[i].length; j++)
@@ -507,10 +583,7 @@ public class PuzzlePanel extends JPanel
 						hposx = positions[i][j].x;
 						hposy = positions[i][j].y;
 					}
-					//x += width;
 				}
-				//x = 0;
-				//y += height;
 			}
 			
 			if(highlight != null)
