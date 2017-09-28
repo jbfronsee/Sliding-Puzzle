@@ -287,7 +287,7 @@ public class Solver {
 		HashSet<PState> closed = new HashSet<PState>();
 
 		PState currState = root;
-		while(!currState.isGoal(goal, multi))
+		while(currState != null && !currState.isGoal(goal, multi))
 		{
 			ArrayList<PState> successors = currState.genSuccessors();
 			for(PState state: successors)

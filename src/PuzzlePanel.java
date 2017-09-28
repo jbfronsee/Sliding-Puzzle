@@ -336,43 +336,11 @@ public class PuzzlePanel extends JPanel
 		
 		if(solution != null)
 		{
-		
 			LinkedList<Byte> path = solution.constructPath();
-		
-			String pString = "[";
-			for(Byte dir: path)
-			{
-				switch(dir.byteValue())
-				{
-				case Constants.LEFT:
-					pString += "LEFT";
-					break;
-				case Constants.RIGHT:
-					pString +="RIGHT";
-					break;
-				case Constants.UP:
-					pString += "UP";
-					break;
-				case Constants.DOWN:
-					pString += "DOWN";
-					break;
-				default:
-					break;
-				}
-				pString += ", ";
-			}
-
-			pString += "]";
-
-			System.out.println(pString);
-
-			System.out.println(path.size());
-
 			return path;
 		}
 		
 		return null;
-		//animateSolution();
 	}
 	
 	/**
