@@ -1,7 +1,9 @@
 # Sliding-Puzzle
 Sliding puzzle game with 8-puzzle, 15-puzzle, and 24-puzzle.
 
-Compile and run with commands:
+Compile with:
 mkdir bin
 javac -d bin src/*.java
+
+Run with:
 java -cp bin SlidingPuzzle
